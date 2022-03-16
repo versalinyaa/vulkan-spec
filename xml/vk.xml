@@ -7214,6 +7214,11 @@ typedef void* <name>MTLSharedEvent_id</name>;
             <member noautovalidity="true" optional="true"><type>void</type>*        <name>pNext</name></member>
             <member><type>VkBool32</type>                           <name>shaderEarlyAndLateFragmentTests</name></member>
         </type>
+        <type category="struct" name="VkExternalMemoryAcquireUnmodifiedEXT" structextends="VkBufferMemoryBarrier,VkBufferMemoryBarrier2,VkImageMemoryBarrier,VkImageMemoryBarrier2">
+            <member values="VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_EXT"><type>VkStructureType</type> <name>sType</name></member>
+            <member optional="true">const <type>void</type>*    <name>pNext</name></member>
+            <member><type>VkBool32</type>                       <name>acquireUnmodifiedMemory</name></member>
+        </type>
         <type category="struct" name="VkExportMetalObjectCreateInfoEXT" structextends="VkInstanceCreateInfo,VkMemoryAllocateInfo,VkImageCreateInfo,VkImageViewCreateInfo,VkBufferViewCreateInfo,VkSemaphoreCreateInfo,VkEventCreateInfo" allowduplicate="true">
             <member values="VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT"><type>VkStructureType</type> <name>sType</name></member>
             <member optional="true">const <type>void</type>*                <name>pNext</name></member>
@@ -19987,10 +19992,12 @@ typedef void* <name>MTLSharedEvent_id</name>;
                 <enum value="&quot;VK_ARM_extension_453&quot;"          name="VK_ARM_EXTENSION_453_EXTENSION_NAME"/>
             </require>
         </extension>
-        <extension name="VK_GOOGLE_extension_454" number="454" author="GOOGLE" contact="Chad Versace @chadversary" supported="disabled">
+        <extension name="VK_EXT_external_memory_acquire_unmodified" number="454" type="device" requires="VK_KHR_external_memory" author="EXT" contact="Chad Versace @chadversary" supported="vulkan">
             <require>
-                <enum value="0"                                         name="VK_GOOGLE_EXTENSION_454_SPEC_VERSION"/>
-                <enum value="&quot;VK_GOOGLE_extension_454&quot;"       name="VK_GOOGLE_EXTENSION_454_EXTENSION_NAME"/>
+                <enum value="1"                                                         name="VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_SPEC_VERSION"/>
+                <enum value="&quot;VK_EXT_external_memory_acquire_unmodified&quot;"     name="VK_EXT_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_EXTENSION_NAME"/>
+                <enum offset="0" extends="VkStructureType"                              name="VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_ACQUIRE_UNMODIFIED_EXT"/>
+                <type name="VkExternalMemoryAcquireUnmodifiedEXT"/>
             </require>
         </extension>
         <extension name="VK_GOOGLE_extension_455" number="455" author="GOOGLE" contact="Chad Versace @chadversary" supported="disabled">

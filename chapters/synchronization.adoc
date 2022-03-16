@@ -6562,6 +6562,79 @@ operation_, the release and acquire operations of a queue family ownership
 transfer can: only be performed using flink:vkCmdPipelineBarrier.
 ====
 
+ifdef::VK_EXT_external_memory_acquire_unmodified[]
+[[synchronization-external-queue-family-ownership-transfer-hints]]
+==== Performance Hints for External Queue Family Ownership Transfer
+
+[open,refpage='VkExternalMemoryAcquireUnmodifiedEXT',desc='Provide a performance hint when acquiring ownership of external memory',type='structs']
+--
+If an application releases ownership of an external resource
+to an external queue family and later re-acquires ownership,
+the acquire operation may: be expensive.
+If the ranges of slink:VkDeviceMemory to which the external resource is bound
+remained unmodified between the release and acquire,
+then the application should: provide a hint to the acquire operation
+that may: reduce its runtime cost.
+To provide the hint,
+add a slink:VkExternalMemoryAcquireUnmodifiedEXT structure to the pname:pNext chain
+of the acquire operation's memory barrier structure,
+such as slink:VkImageMemoryBarrier or slink:VkBufferMemoryBarrier.
+
+The sname:VkExternalMemoryAcquireUnmodifiedEXT structure is defined as:
+
+include::{generated}/api/structs/VkExternalMemoryAcquireUnmodifiedEXT.adoc[]
+
+  * pname:sType is the type of this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:acquireUnmodifiedMemory specifies, if ename:VK_TRUE,
+    that the resource's slink:VkDeviceMemory
+    has remained unmodified since the resource's most recent release
+    of ownership to the external queue family specified
+    by this barrier's pname:srcQueueFamilyIndex.
+    If ename:VK_FALSE, it specifies nothing.
+
+Within the scope of sname:VkExternalMemoryAcquireUnmodifiedEXT,
+a resource's device memory is considered _unmodified_
+if no bit was modified
+in each range of slink:VkDeviceMemory bound to the resource.
+This definition of _unmodified_ refers only to the physical bits
+belonging to the payload of the slink:VkDeviceMemory objects.
+It is independent of operations such as image layout transitions, shader
+access, transfer commands, etc.
+It is also independent of any implementation-private memory
+that is associated with the resource
+and does not reside in a range of slink:VkDeviceMemory bound to the resource.
+
+This struct is ignored if pname:acquireUnmodifiedMemory is ename:VK_FALSE.
+In particular, ename:VK_FALSE does not specify
+that the resource's slink:VkDeviceMemory was modified.
+
+This struct is ignored if the memory barrier's pname:srcQueueFamilyIndex
+is not a special queue family reserved for external memory ownership transfers.
+
+[NOTE]
+.Note
+====
+The method by which the application determines whether the memory was modified
+during the external queue family's ownership is outside the scope of Vulkan.
+====
+
+.Valid Usage
+****
+  * If pname:acquireUnmodifiedMemory is ename:VK_TRUE,
+    and the barrier's pname:srcQueueFamilyIndex
+    is a special queue family reserved for external memory ownership transfers
+    (as described in <<synchronization-queue-transfers>>),
+    then each range of slink:VkDeviceMemory bound to the resource
+    must: be bit-for-bit unmodified
+    since the resource's most recent release of ownership
+    to the queue family specified by the barrier's pname:srcQueueFamilyIndex.
+****
+
+include::{generated}/validity/structs/VkExternalMemoryAcquireUnmodifiedEXT.adoc[]
+--
+endif::VK_EXT_external_memory_acquire_unmodified[]
 
 [[synchronization-wait-idle]]
 == Wait Idle Operations
