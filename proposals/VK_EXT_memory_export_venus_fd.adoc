@@ -1,0 +1,228 @@
+// Copyright 2024 The Khronos Group Inc.
+//
+// SPDX-License-Identifier: CC-BY-4.0
+
+= VK_EXT_memory_venus_fd_export
+:toc: left
+:refpage: https://www.khronos.org/registry/vulkan/specs/1.3-extensions/man/html/
+:vkspec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html
+:sectnums:
+
+This document proposes API that enables link:https://docs.mesa3d.org/drivers/venus.html[Venus]
+to implement link:{refpage}vkAllocateMemory.html[vkAllocateMemory]
+for host-visible link:{refpage}VkDeviceMemory.html[VkDeviceMemory] 
+without relying on undefined Vulkan behavior or unstable implementation-specific details.
+This API is intended to be private between Venus and its underlying Vulkan driver.
+
+== Background
+
+link:https://docs.mesa3d.org/drivers/venus.html[Venus] is a Mesa project that implements Vulkan in a VM (virtual
+machine).  The implementation relies largely on (a) the Linux kernel's virtio interface and (b) forwarding the Vulkan
+API, over the Venus protocol, between the Venus Vulkan driver in the VM guest and a Venus server in the VM host.  In the
+VM host, the Venus server translates the received Vulkan API requests into calls to an underlying Vulkan driver, usually
+a hardware Vulkan driver.
+
+== Problem Statement
+
+Any Vulkan implementation that is primarily implemented by forwarding the Vulkan API across a VM boundary will have
+peculiar implementation difficulties.
+One difficulty is the implementation of link:{refpage}vkAllocateMemory.html[vkAllocateMemory] for host-visible memory.
+(Recall that _host-visible memory_ refers to any link:{refpage}VkDeviceMemory.html[VkDeviceMemory]
+whose link:{refpage}VkMemoryType.html[VkMemoryType::propertyFlags] contains a host-visible bit.
+
+When the application in the VM guest requests allocation of host-visible `VkDeviceMemory`, Venus must allocate memory
+(not necessarily with Vulkan API) that will satisfy the requirements below.
+
+  * In the VM host:
+      ** The memory must be represented by a `VkDeviceMemory` object by the Venus server's underlying Vulkan driver.
+      ** Corollary: The memory must be accessible by the Venus server's underlying Vulkan device.
+  * In the VM guest:
+      ** The memory must be represented by a `VkDeviceMemory` object by the application's Venus Vulkan driver.
+      ** The `VkDeviceMemory` must satisfy the link:{refpage}VkMemoryType.html[VkMemoryType::propertyFlags]
+         of the link:{refpage}VkMemoryAllocateInfo.html[VkMemoryAllocateInfo::memoryTypeIndex]
+         requested by the application, such as flags for coherency and cache behavior.
+      ** Corollary: The `VkDeviceMemory` must support link:{refpage}vkMapMemory.html[vkMapMemory]
+         because it is host-visible.
+
+The most difficult requirement above is the one for `VkMemoryType::propertyFlags`.
+For example, if the application requests allocation of `VkDeviceMemory` with `VK_MEMORY_PROPERTY_HOST_COHERENT_BIT`,
+then the coherency must be satisified _across the VM boundary_, between the _VM guest's CPU virtual address range_ in
+the application and the _VM host's GPU virtual address range_ in the underlying Vulkan device.
+
+== Solution Space
+
+Possible solutions can be categorized along several, mostly independent axes.
+
+* *VM Allocation Origin*
+    ** Allocate in the VM host and export to the VM guest.
+    ** Allocate in the VM guest and export to the VM host.
+* *Allocation API*
+    ** Allocate with Vulkan API in the VM host.
+    ** Allocate with non-Vulkan API in the VM host.
+    ** Allocate with non-Vulkan API in the VM guest.
+* *External Memory Classification:* How to classify the VM host's Venus-compatible host-visible `VkDeviceMemory`?
+    ** Classify it as Vulkan external memory,
+       as defined in link:{vkspec}#VK_KHR_external_memory[VK_KHR_external_memory],
+       and re-use existing link:{refpage}VkExternalMemoryHandleTypeFlagBits.html[VkExternalMemoryHandleTypeFlagBits].
+       (After all, any solution _must_ import the memory into Vulkan or export it from Vulkan).
+    ** Classify it as Vulkan external memory
+       and define new link:{refpage}VkExternalMemoryHandleTypeFlagBits.html[VkExternalMemoryHandleTypeFlagBits].
+    ** Define the memory's Venus-specific capabilities to be orthogonal to any behavior related to Vulkan external
+       memory.
+* *Platform-Specific Documentation.* Where to document the memory's interactions with platform-specific APIs?
+    ** Fully document it in the Vulkan specification.
+    ** Defer to external documentation for most platform interactions.
+
+== Proposal
+
+=== VM Allocation Origin
+
+Choose to allocate in the VM host and export to the VM guest. This choice is required because the Linux kernel (as of
+early 2024) lacks uapi for the opposite direction, in particular for GPU device-local memory.
+
+=== Allocation API
+
+Choose to allocate in the VM host with `vkAllocateMemory`, as opposed to using a non-Vulkan API. This choice avoids the
+need to create API in a separate allocator library (such as GBM) that is continually updated as new
+`VkMemoryPropertyFlags` are added to Vulkan. It also avoids the risk of accidentally divergent behavior, for various
+combinations of `VkMemoryPropertyFlags`, between the Venus server's underlying Vulkan driver and the hypothetical
+allocator library.
+
+=== External Memory Classification
+
+Choose to define the memory's Venus-specific capabilities to be orthogonal to any status related to Vulkan external
+memory.
+
+This choice significantly reduces the complexity and quantity of the extension's specification language; and avoids
+disruptive interactions with existing specification text about external images and external buffers. The problem to be
+solved in this proposal is merely to support host-visible `VkDeviceMemory`, and it is best to avoid if possible any
+interactions related to other Vulkan resources such as images and buffers. Each host-visible `VkDeviceMemory` has two
+sides of access from the application's perspective, access by the Vulkan device and by the Vulkan host; as long as Venus
+implements spec-conformant behavior for each access side as required by the memory's `VkMemoryType`, then this extension
+_can_ avoid all specification interaction with Vulkan resources bound to that memory, even though the two access sides
+lie on different sides of a VM boundary, even if the application requests the memory be allocated as external memory and
+binds it to an external resource.
+
+=== Platform-Specific Documentation
+
+Choose to follow the precedent of many other _Vulkan System Integration_ extensions.  The interactions between
+platform-specific APIs and the Venus-compatible host-visible memory, declare it to be out of scope for the Vulkan
+specification and defer to external documentation, except for special cases that directly impact the behavior of Vulkan.
+The Vulkan specification is not an appropriate place for documenting in-depth the behavior of Linux file descriptors, Linux
+sockets, nor Linux kernel ioctls that manage virtual machines.
+
+=== Vulkan API
+
+TODO(zzyiwei): Choose a name for `vn_todo_flags`.
+
+Type `vn_todo_flags` is defined as `typedef uint64_t vn_todo_flags` by Venus headers and documented in Venus
+documentation.
+
+The Venus server can export a Venus-compatible host-visible `VkDeviceMemory` to a file descriptor with Venus-specific
+capabilities by calling `vkGetMemoryVenusFdEXT` (defined below). The `flags` member describes the fd's Venus-specific
+capabilities.
+
+[source,c]
+----
+typedef struct VkMemoryGetVenusFdInfoEXT {{
+    VkStructureType     sType;
+    const void*         pNext;
+    VkDeviceMemory      memory;
+    vn_todo_flags       flags;
+} VkMemoryGetVenusFdInfoEXT;
+
+VkResult vkGetMemoryVenusFdEXT(
+    VkDevice                            device,
+    const VkMemoryGetVenusFdInfoEXT*    pInfo,
+    int*                                pFd);
+----
+
+The Venus server can allocate Venus-compatible host-visible memory by passing `VkMemoryVenusFdExportAllocateInfoEXT`
+(defined below) to `vkAllocateMemory`. For a given `VkDeviceMemory`, the `flags` here must be equal to the `flags` given
+to `vkGetMemoryVenusFdEXT`.
+
+[source,c]
+----
+// Extends VkMemoryAllocateInfo
+typedef struct VkMemoryVenusFdExportAllocateInfoEXT {
+    VkStructureType     sType;
+    const void*         pNext;
+    vn_todo_flags       flags;
+} VkMemoryVenusFdExportAllocateInfoEXT;
+----
+
+The Venus server can query which `vn_todo_flags` a `VkMemoryType` supports by calling
+`vkGetMemoryTypeVenusFdExportPropertiesEXT` (defined below). The `vn_todo_flags` given to `vkAllocateMemory` and
+`vkGetMemoryVenusFdEXT` must be a non-empty subset of the `supportedFlags` here. The valid subsets are defined in the
+Venus documentation. If `supportedFlags` is empty, then Venus-compatible host-visible memory cannot be allocated from
+the queried `VkMemoryType`.
+
+[source,c]
+----
+typedef struct VkMemoryTypeVenusFdExportInfoEXT {
+    VkStructureType     sType;
+    const void*         pNext;
+    uint32_t            memoryTypeIndex;
+} VkMemoryTypeVenusFdExportInfoEXT;
+
+typedef struct VkMemoryTypeVenusFdExportPropertiesEXT {
+    VkStructureType     sType;
+    void*               pNext;
+    vn_todo_flags       supportedFlags;
+} VkMemoryTypeVenusFdExportPropertiesEXT;
+
+VkResult vkGetMemoryTypeVenusFdExportPropertiesEXT(
+    VkPhysicalDevice                        physicalDevice,
+    uint32_t                                count,
+    const VkMemoryTypeVenusFdExportInfoEXT*     pInfos,
+    VkMemoryTypeVenusFdExportPropertiesEXT*     pProperties);
+----
+
+Finally, the Venus server can enable this API by passing `VkPhysicalDeviceMemoryVenusFdExportFeaturesEXT` (defined
+below) to `vkCreateDevice` with `memoryVenusFdExport` set to true.
+
+[source,c]
+----
+// Extends VkPhysicalDeviceFeatures2, VkDeviceCreateInfo
+typedef struct VkPhysicalDeviceMemoryVenusFdExportFeaturesEXT {
+    VkStructureType     sType;
+    void*               pNext;
+    VkBool32            memoryVenusFdExport;
+} VkPhysicalDeviceMemoryVenusFdExportFeaturesEXT;
+----
+
+== Future Improvements
+
+A potential improvement is to skip the creation of the fd and instead directly create a memory mapping, with
+`vkMapMemory2KHR`, that satisfies this proposal's problem statement. Considering only the necessary Vulkan API and
+ignoring implementation details, this can be easily achieved by extending `VkMemoryMapInfoKHR`.
+
+== Issues
+
+=== How is the exported fd used?
+
+That is an implementation detail of Venus. Venus decides how to use the fd according to the capabilities advertised by
+`VkMemoryTypeVenusFdExportPropertiesEXT::supportedFlags`, which are defined by the Venus documentation.
+
+=== Does `vkGetMemoryVenusFdEXT` accept imported external `VkDeviceMemory`?
+
+No. In Venus's current architecture (2024-08-07), this is unneeded. Therefore it would unnecessarily complicate the
+API's specification.
+
+=== Should the exported fd be assigned an external memory type handle (`VkExternalMemoryHandleTypeFlags`)?
+
+Maybe. Even though the exported fd is not formally classified as Vulkan external memory
+(as defined in link:{vkspec} #VK_KHR_external_memory[VK_KHR_external_memory]),
+labeling the fd as an _opaque fd_ or _dma\_buf fd_ may assist Venus in using the fd correctly
+when importing the fd into a different, and likely out-of-process, `VkDevice`.
+
+If this issue is resolved to _yes_, then a singular `memoryHandleType` member should be added to
+`VkMemoryTypeVenusFdExportInfoEXT` and `VkMemoryGetVenusFdInfoEXT`; and either singular `memoryHandleType` or plural
+`memoryHandleTypes` to `VkMemoryVenusFdExportAllocateInfoEXT`.
+
+=== Should the Vulkan API be defined in `vulkan_core.h` or elsewhere?
+
+This extension should only be used between the Venus server and its underlying Vulkan driver. Given this highly specific
+use case, it is probably best to define the API outside of `vulkan_core.h`. A plausible choice is a new
+platform-specific header named `vulkan_venus_server.h`, similar to the existing headers `vulkan_android.h`,
+`vulkan_wayland.h`, etc.

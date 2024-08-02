@@ -1711,6 +1711,12 @@ ifdef::VK_EXT_metal_objects[]
     pname:exportObjectType member must: be
     ename:VK_EXPORT_METAL_OBJECT_TYPE_METAL_BUFFER_BIT_EXT
 endif::VK_EXT_metal_objects[]
+ifdef::VK_EXT_memory_venus_fd_export+VK_KHR_external_memory[]
+    If the parameters define an an import operation,
+    then the pname:pNext chain must: not include a
+    slink:VkMemoryVenusFdExportAllocateInfoEXT structure whose pname:flags is
+    non-zero.
+endif::VK_EXT_memory_venus_fd_export+VK_KHR_external_memory[]
 ****
 
 include::{generated}/validity/structs/VkMemoryAllocateInfo.adoc[]
@@ -4706,3 +4712,171 @@ endif::VK_KHR_buffer_device_address[]
 include::{generated}/validity/structs/VkDeviceMemoryOpaqueCaptureAddressInfo.adoc[]
 --
 endif::VK_VERSION_1_2,VK_KHR_buffer_device_address[]
+
+ifdef::VK_EXT_memory_venus_fd_export[]
+[[memory-venus]]
+== Venus
+
+This section describes Vulkan API that facilitates implementations of Venus. In
+the below APIs, the type ename:vn_todo_flags is defined as
+`typdef uint64_t vn_todo_flags`
+by Venus headers and documented in the
+link:https://docs.mesa3d.org/drivers/venus.html[Venus documentation].
+
+[Venus is a Mesa project that implements Vulkan in a VM (virtual machine).  The
+implementation relies largely on (a) the Linux kernel's virtio interface and (b)
+forwarding the Vulkan API, over the Venus protocol, between the Venus Vulkan
+driver in the VM guest and a Venus server in the VM host.  In the VM host, the
+Venus server translates the received Vulkan API requests into calls to an
+underlying Vulkan driver, usually a hardware Vulkan driver.
+
+[open,refpage='vkGetMemoryTypeVenusFdExportPropertiesEXT',desc='Queries memory types for Venus capabilities',type='protos']
+--
+To query a memory type's support for allocating device memory that can: be
+exported to a file-descriptor with Venus capabilities, call:
+
+include::{generated}/api/protos/vkGetMemoryTypeVenusFdExportPropertiesEXT.adoc[]
+
+  * pname:physicalDevice is the handle to the device to query.
+  * pname:count is the number of elements in the pname:pInfos array and in the
+    pname:pProperties array, and may: be 0.
+  * pname:pInfos is an array of slink:VkMemoryTypeVenusFdExportInfoEXT
+    structures describing the memory types to be queried.
+  * pname:pProperties is an array of slink:VkMemoryTypeVenusFdExportPropertiesEXT
+    structures in which the properties are returned.
+
+In array pname:pInfos, multiple memory types can: be queried simultaneously.  It
+is valid to query the same memory type multiple times in the array. For a given
+memory type, each time it is queried, whether in a single call or across multiple calls,
+the implementation must: return the same value of
+slink:VkMemoryTypeVenusFdExportPropertiesEXT::pname:supportedFlags.
+
+include::{generated}/validity/protos/vkGetMemoryTypeVenusFdExportPropertiesEXT.adoc[]
+--
+
+[open,refpage='VkMemoryTypeVenusFdExportInfoEXT',desc='Structure specifying a memory type to be queried for Venus capabilities',type='structs']
+--
+The sname:VkMemoryTypeVenusFdExportInfoEXT structure is defined as:
+
+include::{generated}/api/structs/VkMemoryTypeVenusFdExportInfoEXT.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:memoryTypeIndex specifies the memory type to query.
+
+.Valid Usage
+****
+  * pname:memoryTypeIndex must: be less than
+    slink:VkPhysicalDeviceMemoryProperties::pname:memoryTypeCount.
+****
+
+include::{generated}/validity/structs/VkMemoryTypeVenusFdExportInfoEXT.adoc[]
+--
+
+[open,refpage='VkMemoryTypeVenusFdExportPropertiesEXT',desc='Structure specifying Venus capabilities of a memory type',type='structs']
+--
+The sname:VkMemoryTypeVenusFdExportPropertiesEXT structure is defined as:
+
+include::{generated}/api/structs/VkMemoryTypeVenusFdExportPropertiesEXT.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:supportedFlags specifies the Venus capabilities supported by
+    the memory type.
+
+If pname:supportedFlags is empty, then device memory allocated from the memory
+type does not support being exported as a file descriptor with Venus
+capabilities.
+
+include::{generated}/validity/structs/VkMemoryTypeVenusFdExportPropertiesEXT.adoc[]
+--
+
+[open,refpage='VkMemoryVenusFdExportAllocateInfoEXT',desc='Structure containing parameters for allocating memory with Venus-specific capabilities',type='structs']
+--
+To allocate a device memory object that supports being exported to a file
+descriptor with Venus capabilities, extend slink:VkMemoryAllocateInfo with
+sname: VkMemoryVenusFdExportAllocateInfoEXT when calling flink:vkAllocateMemory.
+
+The sname:VkMemoryVenusFdExportAllocateInfoEXT structure is defined as:
+
+include::{generated}/api/structs/VkMemoryVenusFdExportAllocateInfoEXT.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:flags specifies the Venus capabilities to be supported by the memory
+    object.
+
+If pname:flags is `0`, then this structure is ignored.
+
+The pname:pNext chain of slink:VkMemoryAllocateInfo must: not contain a
+sname:VkMemoryVenusFdExportAllocateInfoEXT structure with non-zero pname:flags
+if the parameters to flink:vkAllocateMemory define a
+<<memory-import-operation,memory import operation>>.
+
+.Valid Usage
+****
+  * pname:flags must: be a subset of the
+    slink:VkMemoryTypeVenusFdExportPropertiesEXT::pname:supportedFlags
+    returned for slink:VkMemoryAllocateInfo::pname:memoryTypeIndex,
+    as queried by flink:vkGetMemoryTypeVenusFdExportPropertiesEXT.
+  * pname:flags must: be a valid set of flags according to
+    link:https://docs.mesa3d.org/drivers/venus.html[Venus documentation].
+****
+
+include::{generated}/validity/structs/VkMemoryVenusFdExportAllocateInfoEXT.adoc[]
+--
+
+[open,refpage='vkGetMemoryVenusFdEXT',desc='Exports a file descriptor with Venus capabilities from a device memory object',type='protos']
+--
+To export a file descriptor with Venus capabilities from a device memory object, call:
+
+include::{generated}/api/protos/vkGetMemoryVenusFdEXT.adoc[]
+
+  * pname:device is the logical device that created the device memory being
+    exported.
+  * pname:pInfo is a pointer to a slink:VkMemoryGetVenusFdInfoEXT structure that
+    contains parameters for the export operation.
+  * pname:pFd will return a file descriptor that supports the Venus capabilities
+    described in pname:pInfo and that references the payload of the device
+    memory object.
+
+Each call to fname:vkGetMemoryVenusFdEXT must: create a new file descriptor and
+must: transfer ownership of the file descriptor to the application.
+To avoid leaking resources, the application must: release ownership of the
+file descriptor using the code:close system call when it is no longer
+needed.
+Where supported by the operating system, the implementation must: set the file
+descriptor to be closed automatically when an code:execve system call is made.
+
+include::{generated}/validity/protos/vkGetMemoryTypeVenusFdExportPropertiesEXT.adoc[]
+--
+
+[open,refpage='VkMemoryGetVenusFdInfoEXT',desc='Structure describing a memory export operation to a file descriptor with Venus capabilities',type='structs']
+--
+The sname:VkMemoryGetVenusFdInfoEXT structure is defined as:
+
+include::{generated}/api/structs/VkMemoryGetVenusFdInfoEXT.adoc[]
+
+  * pname:sType is a elink:VkStructureType value identifying this structure.
+  * pname:pNext is `NULL` or a pointer to a structure extending this
+    structure.
+  * pname:memory is the memory object from which the file descriptor will be
+    exported.
+  * pname:flags specifies the Venus capabilities supported by the exported
+    file descriptor.
+
+.Valid Usage
+****
+  * pname:flags must: be identical to the value of
+    slink:VkMemoryVenusFdExportAllocateInfoEXT::pname:flags used when allocating
+    the device memory object.
+  * pname:flags must: be a valid set of flags according to
+    link:https://docs.mesa3d.org/drivers/venus.html[Venus documentation].
+****
+
+include::{generated}/validity/structs/VkMemoryGetVenusFdInfoEXT.adoc[]
+--
+endif::VK_EXT_memory_venus_fd_export[]

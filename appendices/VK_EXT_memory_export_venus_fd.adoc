@@ -1,0 +1,42 @@
+// Copyright 2024 The Khronos Group, Inc.
+// SPDX-License-Identifier: CC-BY-4.0
+
+include::{generated}/meta/{refprefix}VK_EXT_memory_export_venus_fd.adoc[]
+
+=== Other Extension Metadata
+
+*Last Modified Date*::
+    2024-08-07
+
+*IP Status*::
+    No known IP claims.
+
+*Contributors*::
+  - Chia-I Wu, Google
+  - Lina Versace, Google
+  - Yiwei Zhang, Google
+
+=== Description
+
+apiext:VK_EXT_memory_export_venus_fd enables link:https://docs.mesa3d.org/drivers/venus.html[Venus]
+to implement link:{refpage}vkAllocateMemory.html[vkAllocateMemory]
+for host-visible link:{refpage}VkDeviceMemory.html[VkDeviceMemory],
+by exporting an fd with Venus-specific capabilities,
+without relying on undefined Vulkan behavior or unstable implementation-specific details.
+This API is intended to be private between Venus and its underlying Vulkan driver.
+
+link:https://docs.mesa3d.org/drivers/venus.html[Venus] is a Mesa project that implements Vulkan in a virtual
+machine. The implementation relies largely on forwarding the Vulkan API, over the Venus protocol, between the virtual
+machine host and guest.
+
+include::{generated}/interfaces/VK_EXT_memory_export_venus_fd.adoc[]
+
+=== Issues
+
+See proposal doc.
+
+TODO: Embed link to proposal doc.
+
+==== Version History
+
+  * Revision 1, 2024-08-07 (Lina Versace)
